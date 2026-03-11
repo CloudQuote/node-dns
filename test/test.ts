@@ -1,4 +1,4 @@
-const { inspect } = require('util');
+import {inspect} from 'util';
 
 let previous = Promise.resolve();
 
@@ -31,4 +31,4 @@ function color(str, c) {
   return `\x1b[${c}m${str}\x1b[0m`;
 }
 
-module.exports = test;
+export default test;

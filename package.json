@@ -2,19 +2,35 @@
   "name": "dns2",
   "version": "2.1.0",
   "description": "A DNS Server and Client Implementation in Pure JavaScript with no dependencies.",
-  "main": "index.js",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./packet": "./src/packet.ts",
+    "./client/doh": "./src/client/doh.ts",
+    "./client/google": "./src/client/google.ts",
+    "./client/tcp": "./src/client/tcp.ts",
+    "./client/udp": "./src/client/udp.ts",
+    "./server": "./src/server/index.ts",
+    "./server/dns": "./src/server/dns.ts",
+    "./server/doh": "./src/server/doh.ts",
+    "./server/tcp": "./src/server/tcp.ts",
+    "./server/udp": "./src/server/udp.ts",
+    "./package.json": "./package.json"
+  },
   "scripts": {
-    "test": "node test",
+    "test": "node test/index.ts",
     "lint": "eslint .",
     "fix": "eslint . --fix",
-    "example-server-udp": "node example/server/udp.js",
-    "example-server-tcp": "node example/server/tcp.js",
-    "example-server-doh": "node example/server/doh.js",
-    "example-client-doh": "node example/client/doh.js",
-    "example-client-udp": "node example/client/udp.js",
-    "example-client-tcp": "node example/client/tcp.js",
-    "example-client-google": "node example/client/google.js",
-    "example-client-udp-subnet": "node example/client/udp-subnet.js"
+    "example-server-udp": "node example/server/udp.ts",
+    "example-server-tcp": "node example/server/tcp.ts",
+    "example-server-doh": "node example/server/doh.ts",
+    "example-client-doh": "node example/client/doh.ts",
+    "example-client-udp": "node example/client/udp.ts",
+    "example-client-tcp": "node example/client/tcp.ts",
+    "example-client-google": "node example/client/google.ts",
+    "example-client-udp-subnet": "node example/client/udp-subnet.ts"
   },
   "keywords": [
     "dns"
@@ -35,9 +51,11 @@
   },
   "homepage": "https://github.com/song940/node-dns#readme",
   "devDependencies": {
+    "@types/node": "^22.15.30",
     "eslint": "^7.28.0",
     "eslint-config-semistandard": "^15.0.1",
     "eslint-plugin-node": "^11.1.0",
-    "eslint-plugin-promise": "^4.2.1"
+    "eslint-plugin-promise": "^4.2.1",
+    "typescript": "^5.8.3"
   }
 }

@@ -1,5 +1,5 @@
-const dns = require('dns');
-const { UDPClient } = require('../..');
+import dns from 'dns';
+import {UDPClient} from '../../src/index.ts';
 
 const resolve = UDPClient({
   dns: dns.getServers()[0],

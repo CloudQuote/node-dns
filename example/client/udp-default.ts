@@ -1,4 +1,4 @@
-const DNS = require('../..');
+import DNS from '../../src/index.ts';
 
 const dns = new DNS();
 

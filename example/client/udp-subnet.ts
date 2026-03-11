@@ -1,4 +1,4 @@
-const DNS = require('../..');
+import DNS from '../../src/index.ts';
 
 // Lookup directly from ns1.google.com
 const dns = new DNS({ nameServers: [ '216.239.32.10' ] });

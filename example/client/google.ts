@@ -1,4 +1,4 @@
-const { GoogleClient } = require('../..');
+import {GoogleClient} from '../../src/index.ts';
 
 (async() => {
   const resolve = GoogleClient();

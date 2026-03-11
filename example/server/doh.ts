@@ -1,6 +1,6 @@
-const dns = require('../..');
-const path = require('path');
-const fs = require('fs');
+import dns from '../../src/index.ts';
+import path from 'path';
+import fs from 'fs';
 
 const { Packet } = dns;
 

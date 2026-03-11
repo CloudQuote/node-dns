@@ -1,8 +1,6 @@
-const { TCPClient } = require('../..');
+import {UDPClient} from "../../src/index.ts";
 
-const resolve = TCPClient({
-  dns: '1.1.1.1',
-});
+const resolve = UDPClient();
 
 (async() => {
   const response = await resolve('google.com');

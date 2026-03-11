@@ -1,4 +1,4 @@
-const { TCPClient } = require('../..');
+import {TCPClient} from '../../src/index.ts';
 
 const resolve = TCPClient();
 

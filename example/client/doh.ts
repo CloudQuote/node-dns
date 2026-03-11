@@ -1,4 +1,4 @@
-const { DOHClient } = require('../..');
+import {DOHClient} from '../../src/index.ts';
 
 // process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 

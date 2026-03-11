@@ -1,4 +1,4 @@
-const dns = require('../..');
+import dns from '../../src/index.ts';
 
 const { Packet } = dns;
 

@@ -1,10 +1,10 @@
-const assert = require('assert');
-const test = require('./test');
-// const { Packet, createDOHServer, createServer } = require('..');
-const { Packet, createDOHServer, createServer, TCPClient, DOHClient, UDPClient } = require('..');
-const http = require('http');
-const tcp = require('net');
-const udp = require('dgram');
+import assert from 'assert';
+import {createDOHServer, createServer, DOHClient, TCPClient, UDPClient} from "../src/index.ts";
+import test from './test.ts';
+import Packet from '../src/packet.ts';
+import http from 'http';
+import tcp from 'net';
+import udp from 'dgram';
 
 /* TODO: below is unused, either delete or use
 const request = Buffer.from([
