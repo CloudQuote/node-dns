@@ -25,6 +25,7 @@ export const TYPE: Record<string, number> = {
   AAAA: 0x1C,
   SRV: 0x21,
   EDNS: 0x29,
+  RRSIG: 0x2E,
   DNSKEY: 0x30,
   SPF: 0x63,
   AXFR: 0xFC,
@@ -130,7 +131,7 @@ export const fromIPv6 = (address: string): string[] => {
   const missingFields = 8 - digits.length + 1;
   return digits.flatMap((digit) => {
     if (digit === '') {
-      return Array(missingFields).fill('0');
+      return Array(missingFields).fill('0000');
     }
     return digit.padStart(4, '0');
   });
