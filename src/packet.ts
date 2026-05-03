@@ -47,9 +47,6 @@ export const EDNS_OPTION_CODE: Record<string, number> = {
   ECS: 0x08,
 };
 
-type ValueOf<T> = T[keyof T];
-type PacketTypeCode = ValueOf<typeof TYPE>;
-type PacketClassCode = ValueOf<typeof CLASS>;
 type PacketTypeName = string;
 
 export interface HeaderFields {
@@ -79,9 +76,56 @@ export interface ResourceFields {
   ttl: number;
   type: number;
   class: number;
+  target?: string;
 }
 
-type ResourceData = ResourceFields & Record<string, unknown>;
+export type ARecordType = Omit<ResourceFields,"type"> & { type: typeof TYPE.A; address: string };
+export type AAAARecordType = Omit<ResourceFields,"type"> & { type: typeof TYPE.AAAA; address: string };
+export type CNAMERecordType = Omit<ResourceFields,"type"> & { type: typeof TYPE.CNAME; domain: string };
+export type PTRRecordType = Omit<ResourceFields,"type"> & { type: typeof TYPE.PTR; name: string };
+export type MXRecordType = Omit<ResourceFields,"type"> & { type: typeof TYPE.MX; exchange: string; priority: number };
+export type TXTRecordType = Omit<ResourceFields,"type"> & { type: typeof TYPE.TXT; data: Buffer|string|Array<string|Buffer> };
+export type NSRecordType = Omit<ResourceFields,"type"> & { type: typeof TYPE.NS; ns: string };
+export type SOARecordType = Omit<ResourceFields,"type"> & {
+  type: typeof TYPE.SOA; name: string; mname: string; rname: string;
+  serial: number; refresh: number; retry: number; expire: number; minimum: number,
+  primary: string; admin: string; expiration: number;
+};
+export type SRVRecordType = Omit<ResourceFields,"type"> & { type: typeof TYPE.SRV; target: string; port: number; priority: number; weight: number };
+export type OPTRecordType = Omit<ResourceFields,"type"> & { type: typeof TYPE.OPT; edns: EDNSRecord };
+export type EDNSRecordType = Omit<ResourceFields,"type"> & {
+  type: typeof TYPE.EDNS;
+  rdata: Array<EdnsOption|EdnsClientSubnetOption>
+};
+export type ECSRecordType = Omit<ResourceFields,"type"> & { type: typeof TYPE.ECS; rdata: ECSOption };
+export type SPFRecordType = Omit<ResourceFields,"type"> & { type: typeof TYPE.SPF; text: string };
+export type CAARecordType = Omit<ResourceFields,"type"> & { type: typeof TYPE.CAA; flags: number; tag: string; value: string };
+export type DNSKeyRecordType = Omit<ResourceFields,"type"> & {
+  type: typeof TYPE.DNSKEY; flags: number; protocol: number; algorithm: number;
+  key: Buffer|string;
+  zoneKey?: boolean, zoneSep?: boolean
+};
+export type RRSigRecordType = Omit<ResourceFields,"type"> & { type: typeof TYPE.RRSIG; typeCovered: number; algorithm: number; labels: number; originalTTL: number; expiration: number; inception: number; keyTag: number; signer: string; signature: Buffer };
+
+type ResourceData =
+  ARecordType |
+  AAAARecordType |
+  CNAMERecordType |
+  PTRRecordType |
+  MXRecordType |
+  TXTRecordType |
+  NSRecordType |
+  SOARecordType |
+  SRVRecordType |
+  OPTRecordType |
+  EDNSRecordType |
+  ECSRecordType |
+  SPFRecordType |
+  CAARecordType |
+  DNSKeyRecordType |
+  RRSigRecordType;
+
+export type ECSOptionRecordType = Omit<ECSOption, "ednsCode">;
 
 export interface EdnsOption {
   ednsCode: number;
@@ -105,9 +149,9 @@ export type PacketInput =
   | undefined;
 
 type ReaderInput = BufferReader | Buffer;
-type ResourceHandler = {
+type ResourceHandler<SpecificResourceType extends ResourceData> = {
   decode?: (this: Resource, reader: BufferReader, length: number) => Resource;
-  encode?: (record: ResourceData, writer?: BufferWriter) => Buffer;
+  encode?: (record: SpecificResourceType, writer?: BufferWriter) => Buffer;
 };
 
 const typeCodeToName = new Map<number, PacketTypeName>(
@@ -277,7 +321,7 @@ export class Resource implements ResourceFields {
     writer.write(resource.ttl, 32);
 
     const encoderName = typeCodeToName.get(resource.type);
-    const handler = encoderName ? (Resource as typeof Resource & Record<string, ResourceHandler>)[encoderName] : undefined;
+    const handler = encoderName ? Resource[encoderName] : undefined;
     if (handler?.encode) {
       return handler.encode(resource, writer);
     }
@@ -296,7 +340,7 @@ export class Resource implements ResourceFields {
     let length = source.read(16);
 
     const parserName = typeCodeToName.get(resource.type);
-    const handler = parserName ? (Resource as typeof Resource & Record<string, ResourceHandler>)[parserName] : undefined;
+    const handler = parserName ? Resource[parserName] : undefined;
     if (handler?.decode) {
       resource = handler.decode.call(resource, source, length);
     } else {
@@ -316,7 +360,7 @@ export class Resource implements ResourceFields {
   }
 }
 
-class ARecord {
+export class ARecord {
   type: number;
   class: number;
   address: string;
@@ -327,7 +371,7 @@ class ARecord {
     this.address = address;
   }
 
-  static encode(record: ResourceData, writer = new BufferWriter()): Buffer {
+  static encode(record: ARecordType, writer = new BufferWriter()): Buffer {
     const address = String(record.address ?? '');
     const parts = address.split('.');
     writer.write(parts.length, 16);
@@ -348,7 +392,7 @@ class ARecord {
   }
 }
 
-class MXRecord {
+export class MXRecord {
   type: number;
   class: number;
   exchange: string;
@@ -361,7 +405,7 @@ class MXRecord {
     this.priority = priority;
   }
 
-  static encode(record: ResourceData, writer = new BufferWriter()): Buffer {
+  static encode(record: MXRecordType, writer = new BufferWriter()): Buffer {
     const exchange = String(record.exchange ?? '');
     const priority = Number(record.priority ?? 0);
     const length = Packet.Name.encode(exchange).length;
@@ -378,20 +422,20 @@ class MXRecord {
   }
 }
 
-class EDNSRecord {
+export class EDNSRecord {
   type: number;
   class: number;
   ttl: number;
-  rdata: EdnsOption[];
+  rdata: Array<EdnsOption|EdnsClientSubnetOption>;
 
-  constructor(rdata: EdnsOption[] = []) {
+  constructor(rdata: Array<EdnsOption|EdnsClientSubnetOption> = []) {
     this.type = TYPE.EDNS;
     this.class = 512;
     this.ttl = 0;
     this.rdata = rdata;
   }
 
-  static decode(reader: BufferReader, length: number): Resource {
+  static decode(reader: BufferReader, length: number): EDNSRecordType {
     const record = Object.assign(Object.create(EDNSRecord.prototype), {
       type: TYPE.EDNS,
       class: 512,
@@ -405,7 +449,7 @@ class EDNSRecord {
       const decoderName = Object.entries(EDNS_OPTION_CODE)
         .find(([, value]) => value === optionCode)?.[0];
       const decoder = decoderName
-        ? (EDNSRecord as typeof EDNSRecord & Record<string, ResourceHandler>)[decoderName]
+        ? EDNSRecord[decoderName]
         : undefined;
 
       if (decoder?.decode) {
@@ -421,7 +465,7 @@ class EDNSRecord {
     return record;
   }
 
-  static encode(record: ResourceData, writer = new BufferWriter()): Buffer {
+  static encode(record: EDNSRecordType, writer = new BufferWriter()): Buffer {
     const rdataWriter = new BufferWriter();
     const rdata = Array.isArray(record.rdata) ? record.rdata as EdnsOption[] : [];
 
@@ -429,7 +473,7 @@ class EDNSRecord {
       const encoderName = Object.entries(EDNS_OPTION_CODE)
         .find(([, value]) => value === option.ednsCode)?.[0];
       const encoder = encoderName
-        ? (EDNSRecord as typeof EDNSRecord & Record<string, ResourceHandler>)[encoderName]
+        ? EDNSRecord[encoderName]
         : undefined;
 
       if (encoder?.encode) {
@@ -449,7 +493,7 @@ class EDNSRecord {
   }
 }
 
-class ECSOption {
+export class ECSOption {
   ednsCode = EDNS_OPTION_CODE.ECS;
   family = 1;
   sourcePrefixLength: number;
@@ -498,7 +542,7 @@ class ECSOption {
     return record;
   }
 
-  static encode(record: ResourceData, writer = new BufferWriter()): Buffer {
+  static encode(record: ECSOptionRecordType, writer = new BufferWriter()): Buffer {
     const ip = String(record.ip ?? '').split('.').map(part => Number.parseInt(part, 10));
     writer.write(Number(record.family ?? 1), 16);
     writer.write(Number(record.sourcePrefixLength ?? 32), 8);
@@ -511,7 +555,7 @@ class ECSOption {
   }
 }
 
-const AAAAHandler: ResourceHandler = {
+const AAAAHandler: ResourceHandler<AAAARecordType> = {
   decode(reader, length) {
     const parts: number[] = [];
     while (length > 0) {
@@ -531,7 +575,7 @@ const AAAAHandler: ResourceHandler = {
   },
 };
 
-const NSHandler: ResourceHandler = {
+const NSHandler: ResourceHandler<NSRecordType> = {
   decode(reader) {
     this.ns = Packet.Name.decode(reader);
     return this;
@@ -544,7 +588,7 @@ const NSHandler: ResourceHandler = {
   },
 };
 
-const CNAMEHandler: ResourceHandler = {
+const CNAMEHandler: ResourceHandler<CNAMERecordType> = {
   decode(reader) {
     this.domain = Packet.Name.decode(reader);
     return this;
@@ -557,7 +601,7 @@ const CNAMEHandler: ResourceHandler = {
   },
 };
 
-const TXTHandler: ResourceHandler = {
+const TXTHandler: ResourceHandler<TXTRecordType> = {
   decode(reader, length) {
     const parts: number[] = [];
     let bytesRead = 0;
@@ -604,7 +648,7 @@ const TXTHandler: ResourceHandler = {
   },
 };
 
-const SOAHandler: ResourceHandler = {
+const SOAHandler: ResourceHandler<SOARecordType> = {
   decode(reader) {
     this.primary = Packet.Name.decode(reader);
     this.admin = Packet.Name.decode(reader);
@@ -632,7 +676,7 @@ const SOAHandler: ResourceHandler = {
   },
 };
 
-const SRVHandler: ResourceHandler = {
+const SRVHandler: ResourceHandler<SRVRecordType> = {
   decode(reader) {
     this.priority = reader.read(16);
     this.weight = reader.read(16);
@@ -652,7 +696,7 @@ const SRVHandler: ResourceHandler = {
   },
 };
 
-const CAAHandler: ResourceHandler = {
+const CAAHandler: ResourceHandler<CAARecordType> = {
   encode(record, writer = new BufferWriter()) {
     const tag = String(record.tag ?? '');
     const value = String(record.value ?? '');
@@ -665,7 +709,7 @@ const CAAHandler: ResourceHandler = {
   },
 };
 
-const DNSKEYHandler: ResourceHandler = {
+const DNSKEYHandler: ResourceHandler<DNSKeyRecordType> = {
   decode(reader, length) {
     const rdata: number[] = [];
     while (rdata.length < length) {
@@ -703,7 +747,7 @@ const DNSKEYHandler: ResourceHandler = {
   },
 };
 
-const RRSIGHandler: ResourceHandler = {
+const RRSIGHandler: ResourceHandler<RRSigRecordType> = {
   decode(reader, length) {
     const dateForSig = (date: number) => {
       const value = new Date(date * 1000);
@@ -766,10 +810,13 @@ Object.assign(EDNSRecord, {
 export default class Packet {
   header: Header;
   questions: Array<Question | QuestionFields>;
-  answers: Array<Resource | ResourceFields>;
-  authorities: Array<Resource | ResourceFields>;
-  additionals: Array<Resource | ResourceFields>;
+  answers: Array<ResourceData>;
+  authorities: Array<ResourceData>;
+  additionals: Array<ResourceData|EDNSRecord>;
 
+
+  static toIPv6 = toIPv6;
+  static fromIPv6 = fromIPv6;
   static TYPE = TYPE;
   static CLASS = CLASS;
   static EDNS_OPTION_CODE = EDNS_OPTION_CODE;
@@ -780,18 +827,18 @@ export default class Packet {
   static Resource = Resource as typeof Resource & {
     A: typeof ARecord;
     MX: typeof MXRecord;
-    AAAA: ResourceHandler;
-    NS: ResourceHandler;
-    PTR: ResourceHandler;
-    CNAME: ResourceHandler;
-    SPF: ResourceHandler;
-    TXT: ResourceHandler;
-    SOA: ResourceHandler;
-    SRV: ResourceHandler;
+    AAAA: ResourceHandler<AAAARecordType>;
+    NS: ResourceHandler<NSRecordType>;
+    PTR: ResourceHandler<PTRRecordType>;
+    CNAME: ResourceHandler<CNAMERecordType>;
+    SPF: ResourceHandler<SPFRecordType>;
+    TXT: ResourceHandler<TXTRecordType>;
+    SOA: ResourceHandler<SOARecordType>;
+    SRV: ResourceHandler<SRVRecordType>;
     EDNS: typeof EDNSRecord & { ECS: typeof ECSOption };
-    CAA: ResourceHandler;
-    DNSKEY: ResourceHandler;
-    RRSIG: ResourceHandler;
+    CAA: ResourceHandler<CAARecordType>;
+    DNSKEY: ResourceHandler<DNSKeyRecordType>;
+    RRSIG: ResourceHandler<RRSigRecordType>;
   };
   static Name = {
     COPY: 0xC0,
@@ -860,6 +907,7 @@ export default class Packet {
       let remaining = count;
       while (remaining > 0) {
         try {
+          //TODO: make this type safe
           packet[section].push(decoder.parse(reader) as never);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
@@ -998,7 +1046,7 @@ export default class Packet {
       ['additionals', Packet.Resource],
     ] as const).forEach(([section, encoder]) => {
       this[section].forEach((resource) => {
-        encoder.encode(resource as never, writer);
+        encoder.encode(resource , writer);
       });
     });
 
@@ -1013,13 +1061,3 @@ export default class Packet {
       .replace(/\//g, '_');
   }
 }
-
-(Packet as typeof Packet & {
-  toIPv6: typeof toIPv6;
-  fromIPv6: typeof fromIPv6;
-}).toIPv6 = toIPv6;
-
-(Packet as typeof Packet & {
-  toIPv6: typeof toIPv6;
-  fromIPv6: typeof fromIPv6;
-}).fromIPv6 = fromIPv6;

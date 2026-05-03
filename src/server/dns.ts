@@ -1,11 +1,14 @@
 import { EventEmitter } from 'node:events';
+import type {ServerResponse} from "node:http";
+import type {AddressInfo} from "node:net";
+import type Packet from "../packet.ts";
 
 import DOHServer, { type DohServerOptions } from './doh.ts';
 import TCPServer from './tcp.ts';
 import UDPServer, { type UdpServerOptions } from './udp.ts';
 
 type ClosableServer = EventEmitter & {
-  address(): unknown;
+  address(): string|AddressInfo;
   close(): unknown;
   listen(port?: number, address?: string): unknown;
 };
@@ -14,7 +17,7 @@ export interface DnsServerOptions {
   doh?: boolean | DohServerOptions;
   tcp?: boolean;
   udp?: boolean | UdpServerOptions;
-  handle?: (...args: unknown[]) => void;
+  handle?: (packet: Packet, response: (message: Packet) => void, client: any) => void;
 }
 
 type ServerMap = {
@@ -66,7 +69,9 @@ export default class DNSServer extends EventEmitter {
         return addresses;
       });
 
-    const emitRequest = (...args: unknown[]) => this.emit('request', ...args);
+    const emitRequest: DnsServerOptions["handle"] = (...args) =>
+      this.emit('request', ...args as Parameters<DnsServerOptions["handle"]>);
+
     const emitRequestError = (error: Error) => this.emit('requestError', error);
     for (const server of servers) {
       server.on('request', emitRequest);

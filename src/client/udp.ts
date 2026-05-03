@@ -41,7 +41,7 @@ const UDPClient = ({ dns = '8.8.8.8', port = 53, socketType = 'udp4' }: UdpClien
       name,
       class: cls,
       type: Packet.TYPE[type],
-    } as never);
+    });
 
     const client = createSocket(socketType);
     return new Promise((resolve, reject) => {

@@ -1,7 +1,7 @@
 import { PassThrough } from 'node:stream';
 import { describe, expect, it } from 'vitest';
 
-import Packet from '../src/packet.ts';
+import Packet, {EdnsClientSubnetOption, EDNSRecord, Resource } from '../src/packet.ts';
 import {
   FIXTURES,
   createPacketBufferRequest,
@@ -39,7 +39,7 @@ describe('packet and codec coverage', () => {
     expect(parsed.authorities[0]).toMatchObject({ type: Packet.TYPE.NS, ns: FIXTURES.ns });
     expect(parsed.authorities[1]).toMatchObject({ type: Packet.TYPE.SOA, primary: FIXTURES.ns, admin: 'admin.example.test' });
     expect(parsed.additionals[0]).toMatchObject({ type: Packet.TYPE.SRV, target: FIXTURES.alias, port: 8443 });
-    expect((parsed.additionals[1] as Packet.Resource & { rdata: Array<{ ip: string }> }).rdata.map(item => item.ip))
+    expect((parsed.additionals[1] as EDNSRecord).rdata.map((item: EdnsClientSubnetOption) => item.ip))
       .toEqual(['203.0.113.0', '198.51.100.7']);
   });
 
@@ -91,7 +91,7 @@ describe('packet and codec coverage', () => {
   });
 
   it('decodes RRSIG resources from raw wire data', () => {
-    const record = Packet.Resource.decode(createRrsigResourceBuffer()) as Packet.Resource & {
+    const record = Packet.Resource.decode(createRrsigResourceBuffer()) as Resource & {
       sigType: number;
       algorithm: number;
       labels: number;
@@ -140,7 +140,7 @@ describe('packet and codec coverage', () => {
       new Packet.Resource.EDNS.ECS('10.9.8.7/32'),
     ]);
 
-    const decoded = Packet.Resource.decode(Packet.Resource.encode(query)) as Packet.Resource & {
+    const decoded = Packet.Resource.decode(Packet.Resource.encode(query)) as Resource & {
       rdata: Array<{ ip: string; sourcePrefixLength: number }>;
     };
     delete decoded.name;

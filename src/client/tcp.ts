@@ -33,7 +33,7 @@ const makeQuery = ({
     ]));
   }
 
-  packet.questions.push({ name, class: cls, type: Packet.TYPE[type] } as never);
+  packet.questions.push({ name, class: cls, type: Packet.TYPE[type] } );
   return packet.toBuffer();
 };
 

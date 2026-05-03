@@ -113,7 +113,7 @@ const buildQuery = ({
     ]));
   }
 
-  packet.questions.push({ name, class: cls, type: Packet.TYPE[type] } as never);
+  packet.questions.push({ name, class: cls, type: Packet.TYPE[type] });
   return packet.toBase64URL();
 };
 

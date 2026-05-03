@@ -1,5 +1,5 @@
-import http from 'node:http';
-import dgram from 'node:dgram';
+import * as http from 'node:http';
+import * as dgram from 'node:dgram';
 import { PassThrough } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -8,7 +8,7 @@ import DNS, {
   TCPClient,
   UDPClient,
 } from '../src/index.ts';
-import Packet from '../src/packet.ts';
+import Packet, {type EdnsClientSubnetOption, type EDNSRecordType} from '../src/packet.ts';
 import {
   FIXTURES,
   closeServer,
@@ -57,10 +57,11 @@ describe('transport integration', () => {
   it('serves UDP queries including EDNS client subnet metadata', async () => {
     const seenQuestions: Array<{ rd: number; clientIp?: string }> = [];
     const { server, port } = await startUdpServer(async (request, send) => {
-      const ecs = request.additionals[0] as Packet.Resource & { rdata?: Array<{ ip: string }> };
+      const ecs = request.additionals[0] as EDNSRecordType;
+      const rdata = ecs?.rdata?.[0] as EdnsClientSubnetOption;
       seenQuestions.push({
         rd: request.header.rd,
-        clientIp: ecs?.rdata?.[0]?.ip,
+        clientIp: rdata?.ip,
       });
       await send(createRichResponse(request));
     });
@@ -95,7 +96,7 @@ describe('transport integration', () => {
     expect(response.authorities[0]).toMatchObject({ ns: FIXTURES.ns });
     expect(response.authorities[1]).toMatchObject({ primary: FIXTURES.ns, admin: 'admin.example.test' });
     expect(response.additionals[0]).toMatchObject({ target: FIXTURES.alias, port: 8443 });
-    expect((response.additionals[1] as Packet.Resource & { rdata: Array<{ ip: string }> }).rdata.map(item => item.ip))
+    expect((response.additionals[1] as EDNSRecordType).rdata.map((item:EdnsClientSubnetOption) => item.ip))
       .toEqual(['203.0.113.0', '198.51.100.7']);
   });
 

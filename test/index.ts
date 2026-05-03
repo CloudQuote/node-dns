@@ -1,10 +1,11 @@
-import assert from 'assert';
+import * as assert from 'assert';
+import type {AddressInfo} from "node:net";
 import {createDOHServer, createServer, DOHClient, TCPClient, UDPClient} from "../src/index.ts";
 import test from './test.ts';
-import Packet from '../src/packet.ts';
-import http from 'http';
-import tcp from 'net';
-import udp from 'dgram';
+import Packet, {type EdnsClientSubnetOption, type NSRecordType, Resource, type TXTRecordType} from '../src/packet.ts';
+import * as http from 'http';
+import * as tcp from 'net';
+import * as udp from 'dgram';
 
 /* TODO: below is unused, either delete or use
 const request = Buffer.from([
@@ -111,7 +112,7 @@ test('Packet#parse', function() {
   assert.equal(packet.questions[0].class, Packet.CLASS.IN);
   assert.equal(packet.answers[0].class, Packet.TYPE.A);
   assert.equal(packet.answers[0].class, Packet.CLASS.IN);
-  assert.equal(packet.answers[0].address, '54.222.60.252');
+  assert.equal((packet.answers[0] as Resource).address, '54.222.60.252');
 });
 
 test('Packet#encode', function() {
@@ -225,7 +226,7 @@ test('Packet#encode array of character strings', function() {
     data  : dkim,
   });
 
-  assert.equal(Packet.parse(response.toBuffer()).answers[0].data, dkim.join(''));
+  assert.equal((Packet.parse(response.toBuffer()).answers[0] as TXTRecordType).data, dkim.join(''));
 });
 
 test('EDNS.ECS#encode', function() {
@@ -246,11 +247,13 @@ test('EDNS#decode', function() {
   const record = Packet.Resource.EDNS.decode(reader, buffer.length);
 
   assert.equal(record.rdata.length, 1);
-  assert.equal(record.rdata[0].ednsCode, 8);
-  assert.equal(record.rdata[0].family, 1);
-  assert.equal(record.rdata[0].sourcePrefixLength, 24);
-  assert.equal(record.rdata[0].scopePrefixLength, 0);
-  assert.equal(record.rdata[0].ip, '10.11.12.13');
+
+  const rdata = record.rdata[0] as EdnsClientSubnetOption;
+  assert.equal(rdata.ednsCode, 8);
+  assert.equal(rdata.family, 1);
+  assert.equal(rdata.sourcePrefixLength, 24);
+  assert.equal(rdata.scopePrefixLength, 0);
+  assert.equal(rdata.ip, '10.11.12.13');
 
   const query = new Packet.Resource.EDNS([
     new Packet.Resource.EDNS.ECS('10.20.0.0/16'),
@@ -278,7 +281,7 @@ test('EDNS#decode multiple', function() {
 
 test('server/doh#cors - default', async function() {
   const server = createDOHServer();
-  const { port } = await new Promise(resolve => {
+  const { port } = await new Promise<{ port: number}>(resolve => {
     server.on('listening', resolve);
     server.listen();
   });
@@ -291,7 +294,7 @@ test('server/doh#cors - no cors', async function() {
   const server = createDOHServer({
     cors: false,
   });
-  const { port } = await new Promise(resolve => {
+  const { port } = await new Promise<{ port: number }>(resolve => {
     server.on('listening', resolve);
     server.listen();
   });
@@ -304,7 +307,7 @@ test('server/doh#cors - cors origin', async function() {
   const server = createDOHServer({
     cors: 'some.domain',
   });
-  const { port } = await new Promise(resolve => {
+  const { port } = await new Promise<{ port: number}>(resolve => {
     server.on('listening', resolve);
     server.listen();
   });
@@ -325,7 +328,7 @@ test('server/doh#cors - cors function', async function() {
       throw new Error(`Unexpected domain: ${domain}`);
     },
   });
-  const { port } = await new Promise(resolve => {
+  const { port } = await new Promise<{ port: number}>(resolve => {
     server.on('listening', resolve);
     server.listen();
   });
@@ -387,14 +390,15 @@ test('server/udp-tcp#simple-request-async-response', async() => {
         data  : [ 'Hello World' ],
       });
 
-      (new Promise((resolve) => setTimeout(() => resolve(), 1))).then(() => send(response));
+      (new Promise((resolve) => setTimeout(() => resolve(null), 1))).then(() => send(response));
     },
   });
   const servers = await server.listen();
-  assert.ok(servers.udp.port > 1000);
-  assert.ok(servers.tcp.port > 1000);
-  const tcp = TCPClient({ dns: '127.0.0.1', port: servers.tcp.port });
-  const udp = UDPClient({ dns: '127.0.0.1', port: servers.udp.port });
+
+  assert.ok((servers.udp as AddressInfo).port > 1000);
+  assert.ok((servers.tcp as AddressInfo).port > 1000);
+  const tcp = TCPClient({ dns: '127.0.0.1', port: (servers.tcp as AddressInfo).port });
+  const udp = UDPClient({ dns: '127.0.0.1', port: (servers.udp as AddressInfo).port });
   const expected = [ { name: 'test.com', ttl: 300, type: 16, class: 1, data: 'Hello World' } ];
   assert.deepEqual((await tcp('test.com')).answers, expected);
   assert.deepEqual((await udp('test.com')).answers, expected);
@@ -409,22 +413,22 @@ test('server/all#invalid-request', async() => {
     handle : () => {},
   });
   const servers = await server.listen();
-  assert.ok(servers.udp.port > 1000);
-  assert.ok(servers.tcp.port > 1000);
-  assert.ok(servers.doh.port > 1000);
+  assert.ok((servers.udp as AddressInfo).port > 1000);
+  assert.ok((servers.tcp as AddressInfo).port > 1000);
+  assert.ok((servers.doh as AddressInfo).port > 1000);
 
   const errors = [];
   server.on('requestError', (e) => {
     errors.push(e);
   });
 
-  const tcpSocket = tcp.connect({ port: servers.tcp.port, host: '127.0.0.1' });
+  const tcpSocket = tcp.connect({ port: (servers.tcp as AddressInfo).port, host: '127.0.0.1' });
   tcpSocket.on('connect', () => tcpSocket.end('INVALID'));
 
   const udpSocket = udp.createSocket('udp4');
-  udpSocket.send('INVALID', servers.udp.port, '127.0.0.1', () => udpSocket.close());
+  udpSocket.send('INVALID', (servers.udp as AddressInfo).port, '127.0.0.1', () => udpSocket.close());
 
-  const dohConn = http.get(`http://127.0.0.1:${servers.doh.port}/dns-query?dns=INVALID`, {
+  const dohConn = http.get(`http://127.0.0.1:${(servers.doh as AddressInfo).port}/dns-query?dns=INVALID`, {
     headers: { accept: 'application/dns-message' },
   }).on('error', () => {});
 
@@ -439,7 +443,7 @@ test('server/all#invalid-request', async() => {
   await server.close();
 });
 
-function get(url, options) {
+function get(url, options = undefined) : Promise<{ body: Buffer, headers: http.IncomingHttpHeaders}> {
   return new Promise((resolve, reject) => {
     try {
       const req = http.get(url, options, res => {
@@ -465,14 +469,19 @@ test('client/doh', async() => {
 
   // console.log(res);
   assert.equal(res.answers.length, 2);
-  assert.equal(res.answers[0].name, 'cdnjs.com');
-  assert.equal(res.answers[0].type, Packet.TYPE.NS);
-  assert.equal(res.answers[0].class, Packet.CLASS.IN);
-  assert.equal(res.answers[0].ns, 'ben.ns.cloudflare.com');
-  assert.equal(res.answers[1].name, 'cdnjs.com');
-  assert.equal(res.answers[1].type, Packet.TYPE.NS);
-  assert.equal(res.answers[1].class, Packet.CLASS.IN);
-  assert.equal(res.answers[1].ns, 'lara.ns.cloudflare.com');
+
+  const answer1 = res.answers[0] as NSRecordType;
+  assert.equal(answer1.name, 'cdnjs.com');
+  assert.equal(answer1.type, Packet.TYPE.NS);
+  assert.equal(answer1.class, Packet.CLASS.IN);
+  assert.equal(answer1.ns, 'ben.ns.cloudflare.com');
+
+  const answer2 = res.answers[1] as NSRecordType;
+  assert.equal(answer2.name, 'cdnjs.com');
+  assert.equal(answer2.type, Packet.TYPE.NS);
+  assert.equal(answer2.class, Packet.CLASS.IN);
+  assert.equal(answer2.ns, 'lara.ns.cloudflare.com');
+
   assert.equal(res.header.qr, 1);
   assert.equal(res.header.ancount, 2);
   assert.equal(res.header.rcode, 0);

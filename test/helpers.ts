@@ -1,6 +1,6 @@
-import http from 'node:http';
-import net from 'node:net';
 import { once } from 'node:events';
+import * as http from "node:http";
+import * as net from "node:net";
 
 import DNS, {
   createDOHServer,
@@ -169,7 +169,7 @@ export const startTcpServer = async (handler?: Parameters<typeof createTCPServer
   return { server, port: address.port };
 };
 
-export const startDohServer = async (options?: ConstructorParameters<typeof createDOHServer>[0]): Promise<{
+export const startDohServer = async (options?: Parameters<typeof createDOHServer>[0]): Promise<{
   server: DOHServer;
   port: number;
 }> => {
@@ -182,7 +182,7 @@ export const startDohServer = async (options?: ConstructorParameters<typeof crea
   return { server, port: address.port };
 };
 
-export const startDnsServer = async (options: ConstructorParameters<typeof createServer>[0]): Promise<{
+export const startDnsServer = async (options: Parameters<typeof createServer>[0]): Promise<{
   server: DNSServer;
   addresses: Awaited<ReturnType<DNSServer['listen']>>;
 }> => {
